@@ -57,14 +57,16 @@ stages:
       - script: |
           set -e
           cd "$(Build.SourcesDirectory)/$(BACK_DIR)"
-          if [ -f package-lock.json ]; then
-            npm ci --omit=dev
-          else
-            npm install --omit=dev --no-audit --no-fund
-          fi
-          # Si tu server escucha process.env.PORT, le pasaremos 8080 en App Settings
-          zip -r "$(Build.ArtifactStagingDirectory)/back.zip" .
-        displayName: Package back (con node_modules)
+          # Validamos que existan package.json y lockfile
+          test -f package.json || (echo "package.json no encontrado" && exit 1)
+          # Empaquetamos el código FUENTE sin node_modules; Azure lo instalará en runtime (Linux)
+          zip -r "$(Build.ArtifactStagingDirectory)/back.zip" . \
+            -x "node_modules/*" \
+            -x ".git/*" \
+            -x "**/.DS_Store" \
+            -x "**/tests/**" \
+            -x "**/*.log"
+        displayName: Package back (sin node_modules)
 
       # Publicar SOLO DOS artifacts
       - publish: $(Build.ArtifactStagingDirectory)/front.zip
@@ -104,7 +106,7 @@ stages:
                     {"name":"WEBSITES_PORT","value":"8080"},
                     {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
                     {"name":"WEBSITE_ENABLE_SYNC_UPDATE_SITE","value":"true"},
-                    {"name":"SCM_DO_BUILD_DURING_DEPLOYMENT","value":"false"},
+                    {"name":"SCM_DO_BUILD_DURING_DEPLOYMENT","value":"true"},
                     {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"0"},
                     {"name":"DATABASE_URL","value":"$(DATABASE_URL_QA)"}
                   ]
@@ -116,7 +118,7 @@ stages:
                 appName: '$(APP_BACK_QA)'
                 deploymentMethod: 'zipDeploy'
                 package: '$(Pipeline.Workspace)/$(ARTIF_BACK)/back.zip'
-                startupCommand: 'node server.js'   # backend/server.js
+                startupCommand: 'bash -c "mkdir -p /home/site/data && node server.js"'   # backend/server.js
 
             # Health BACK QA
             - script: |
@@ -124,7 +126,7 @@ stages:
                 BASE="https://$(APP_BACK_QA).azurewebsites.net"
                 URL="${HEALTH_BACK_QA:-$BASE/healthz}"
                 echo "Health BACK QA: $URL"
-                for i in {1..24}; do
+                for i in {1..60}; do
                   code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
                   echo "  Attempt $i => HTTP $code"
                   [[ "$code" == 2* ]] && exit 0
@@ -217,7 +219,7 @@ stages:
                     {"name":"WEBSITES_PORT","value":"8080"},
                     {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
                     {"name":"WEBSITE_ENABLE_SYNC_UPDATE_SITE","value":"true"},
-                    {"name":"SCM_DO_BUILD_DURING_DEPLOYMENT","value":"false"},
+                    {"name":"SCM_DO_BUILD_DURING_DEPLOYMENT","value":"true"},
                     {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"0"},
                     {"name":"DATABASE_URL","value":"$(DATABASE_URL_PROD)"}
                   ]
@@ -229,7 +231,7 @@ stages:
                 appName: '$(APP_BACK_PROD)'
                 deploymentMethod: 'zipDeploy'
                 package: '$(Pipeline.Workspace)/$(ARTIF_BACK)/back.zip'
-                startupCommand: 'node server.js'
+                startupCommand: 'bash -c "mkdir -p /home/site/data && node server.js"'
 
             # Health BACK PROD
             - script: |
@@ -237,7 +239,7 @@ stages:
                 BASE="https://$(APP_BACK_PROD).azurewebsites.net"
                 URL="${HEALTH_BACK_PROD:-$BASE/healthz}"
                 echo "Health BACK PROD: $URL"
-                for i in {1..24}; do
+                for i in {1..60}; do
                   code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
                   echo "  Attempt $i => HTTP $code"
                   [[ "$code" == 2* ]] && exit 0
