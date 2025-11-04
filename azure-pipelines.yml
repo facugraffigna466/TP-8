@@ -10,7 +10,6 @@ variables:
   NODE_VERSION: '20.x'
   AZ_SUBSCRIPTION_SC: 'MiApp'             # <-- tu Service Connection
   AZ_RESOURCE_GROUP:  'miappservice_group' # (opcional si luego querés usar az cli)
-  AGENT_POOL: 'SelfHosted'                 # <-- tu agent pool
 
   # Estructura del repo (según tu captura)
   FRONT_DIR: 'frontend'
@@ -29,7 +28,7 @@ stages:
     - group: PROD
   jobs:
   - job: build_job
-    pool: { name: $(AGENT_POOL) }
+    pool: { vmImage: 'ubuntu-latest' }
     steps:
       - checkout: self
         clean: true
@@ -83,7 +82,7 @@ stages:
   jobs:
   - deployment: qa_deploy
     environment: 'qa'
-    pool: { name: $(AGENT_POOL) }
+    pool: { vmImage: 'ubuntu-latest' }
     strategy:
       runOnce:
         deploy:
@@ -196,7 +195,7 @@ stages:
   jobs:
   - deployment: prod_deploy
     environment: 'prod'
-    pool: { name: $(AGENT_POOL) }
+    pool: { vmImage: 'ubuntu-latest' }
     strategy:
       runOnce:
         deploy:
