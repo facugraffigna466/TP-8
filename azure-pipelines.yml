@@ -1,0 +1,290 @@
+trigger:
+  branches:
+    include: [ main, master, develop ]
+
+pr:
+  branches:
+    include: [ main, master, develop ]
+
+variables:
+  NODE_VERSION: '20.x'
+  AZ_SUBSCRIPTION_SC: 'MiApp'             # <-- tu Service Connection
+  AZ_RESOURCE_GROUP:  'miappservice_group' # (opcional si luego querés usar az cli)
+  AGENT_POOL: 'SelfHosted'                 # <-- tu agent pool
+
+  # Estructura del repo (según tu captura)
+  FRONT_DIR: 'frontend'
+  BACK_DIR:  'backend'
+
+  # Nombres de artifacts (solo 2)
+  ARTIF_FRONT: 'front'
+  ARTIF_BACK:  'back'
+
+stages:
+# ===================== BUILD =====================
+- stage: Build
+  displayName: Build & Package (Front + Back)
+  variables:
+    - group: QA
+    - group: PROD
+  jobs:
+  - job: build_job
+    pool: { name: $(AGENT_POOL) }
+    steps:
+      - checkout: self
+        clean: true
+
+      - task: NodeTool@0
+        inputs: { versionSpec: '$(NODE_VERSION)' }
+        displayName: Use Node $(NODE_VERSION)
+
+      # ---------- FRONT: 1 solo build con placeholder ----------
+      - script: |
+          set -e
+          cd "$(Build.SourcesDirectory)/$(FRONT_DIR)"
+          npm ci
+          # Build único con placeholder que luego se reemplaza en QA/PROD
+          VITE_API_URL="__API_URL__" npm run build
+          cd dist
+          zip -r "$(Build.ArtifactStagingDirectory)/front.zip" .
+        displayName: Build front (1 artefacto)
+      
+      # ---------- BACK: empaquetado con node_modules de runtime ----------
+      - script: |
+          set -e
+          cd "$(Build.SourcesDirectory)/$(BACK_DIR)"
+          npm ci --omit=dev
+          # Si tu server escucha process.env.PORT, le pasaremos 8080 en App Settings
+          zip -r "$(Build.ArtifactStagingDirectory)/back.zip" .
+        displayName: Package back (con node_modules)
+
+      # Publicar SOLO DOS artifacts
+      - publish: $(Build.ArtifactStagingDirectory)/front.zip
+        artifact: $(ARTIF_FRONT)
+      - publish: $(Build.ArtifactStagingDirectory)/back.zip
+        artifact: $(ARTIF_BACK)
+
+# ===================== QA =====================
+- stage: QA
+  displayName: Deploy QA (Back → Health → Front → Health)
+  dependsOn: Build
+  variables:
+    - group: QA
+  jobs:
+  - deployment: qa_deploy
+    environment: 'qa'
+    pool: { name: $(AGENT_POOL) }
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - download: current
+              artifact: $(ARTIF_BACK)
+            - download: current
+              artifact: $(ARTIF_FRONT)
+
+            # -------- BACK QA: App Settings + Deploy --------
+            - task: AzureAppServiceSettings@1
+              displayName: Configure App Settings BACK QA
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                appName: '$(APP_BACK_QA)'
+                appSettings: |
+                  [
+                    {"name":"NODE_ENV","value":"production"},
+                    {"name":"PORT","value":"8080"},
+                    {"name":"WEBSITES_PORT","value":"8080"},
+                    {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
+                    {"name":"WEBSITE_ENABLE_SYNC_UPDATE_SITE","value":"true"},
+                    {"name":"SCM_DO_BUILD_DURING_DEPLOYMENT","value":"false"},
+                    {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"0"},
+                    {"name":"DATABASE_URL","value":"$(DATABASE_URL_QA)"}
+                  ]
+            - task: AzureWebApp@1
+              displayName: Deploy BACK QA (zipDeploy)
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                appType: 'webAppLinux'
+                appName: '$(APP_BACK_QA)'
+                deploymentMethod: 'zipDeploy'
+                package: '$(Pipeline.Workspace)/$(ARTIF_BACK)/back.zip'
+                startupCommand: 'node server.js'   # backend/server.js
+
+            # Health BACK QA
+            - script: |
+                set -e
+                BASE="https://$(APP_BACK_QA).azurewebsites.net"
+                URL="${HEALTH_BACK_QA:-$BASE/healthz}"
+                echo "Health BACK QA: $URL"
+                for i in {1..24}; do
+                  code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+                  echo "  Attempt $i => HTTP $code"
+                  [[ "$code" == 2* ]] && exit 0
+                  sleep 5
+                done
+                echo "BACK QA health check FAILED"; exit 1
+              displayName: Health BACK QA
+
+            # -------- FRONT QA: re-escritura del placeholder y deploy --------
+            - script: |
+                set -e
+                WORK="$(Pipeline.Workspace)/front_qa"
+                mkdir -p "$WORK"
+                unzip -q "$(Pipeline.Workspace)/$(ARTIF_FRONT)/front.zip" -d "$WORK"
+
+                # sed compatible mac/linux
+                SED_INPLACE="-i"
+                if [[ "$OSTYPE" == "darwin"* ]]; then SED_INPLACE="-i ''"; fi
+
+                find "$WORK" -type f \( -name "*.js" -o -name "*.html" \) -print0 \
+                  | xargs -0 sed $SED_INPLACE -e "s#__API_URL__#$(VITE_API_URL_QA)#g"
+
+                (cd "$WORK" && zip -qr "../front_qa_deploy.zip" .)
+              displayName: Prepare FRONT QA (replace API URL)
+
+            - task: AzureAppServiceSettings@1
+              displayName: Configure App Settings FRONT QA
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                appName: '$(APP_FRONT_QA)'
+                appSettings: |
+                  [
+                    {"name":"NODE_ENV","value":"production"},
+                    {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
+                    {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"1"}
+                  ]
+            - task: AzureWebApp@1
+              displayName: Deploy FRONT QA (runFromPackage)
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                appType: 'webAppLinux'
+                appName: '$(APP_FRONT_QA)'
+                deploymentMethod: 'runFromPackage'
+                package: '$(Pipeline.Workspace)/front_qa_deploy.zip'
+                startupCommand: 'pm2 serve /home/site/wwwroot 8080 --no-daemon --spa'
+
+            # Health FRONT QA
+            - script: |
+                set -e
+                URL="${HEALTH_FRONT_QA:-https://$(APP_FRONT_QA).azurewebsites.net/}"
+                echo "Health FRONT QA: $URL"
+                for i in {1..24}; do
+                  code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+                  echo "  Attempt $i => HTTP $code"
+                  [[ "$code" == 2* ]] && exit 0
+                  sleep 5
+                done
+                echo "FRONT QA health check FAILED"; exit 1
+              displayName: Health FRONT QA
+
+# ===================== PROD =====================
+- stage: PROD
+  displayName: Deploy PROD (Back → Health → Front → Health)
+  dependsOn: QA
+  variables:
+    - group: PROD
+  jobs:
+  - deployment: prod_deploy
+    environment: 'prod'
+    pool: { name: $(AGENT_POOL) }
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - download: current
+              artifact: $(ARTIF_BACK)
+            - download: current
+              artifact: $(ARTIF_FRONT)
+
+            # BACK PROD
+            - task: AzureAppServiceSettings@1
+              displayName: Configure App Settings BACK PROD
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                appName: '$(APP_BACK_PROD)'
+                appSettings: |
+                  [
+                    {"name":"NODE_ENV","value":"production"},
+                    {"name":"PORT","value":"8080"},
+                    {"name":"WEBSITES_PORT","value":"8080"},
+                    {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
+                    {"name":"WEBSITE_ENABLE_SYNC_UPDATE_SITE","value":"true"},
+                    {"name":"SCM_DO_BUILD_DURING_DEPLOYMENT","value":"false"},
+                    {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"0"},
+                    {"name":"DATABASE_URL","value":"$(DATABASE_URL_PROD)"}
+                  ]
+            - task: AzureWebApp@1
+              displayName: Deploy BACK PROD (zipDeploy)
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                appType: 'webAppLinux'
+                appName: '$(APP_BACK_PROD)'
+                deploymentMethod: 'zipDeploy'
+                package: '$(Pipeline.Workspace)/$(ARTIF_BACK)/back.zip'
+                startupCommand: 'node server.js'
+
+            # Health BACK PROD
+            - script: |
+                set -e
+                BASE="https://$(APP_BACK_PROD).azurewebsites.net"
+                URL="${HEALTH_BACK_PROD:-$BASE/healthz}"
+                echo "Health BACK PROD: $URL"
+                for i in {1..24}; do
+                  code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+                  echo "  Attempt $i => HTTP $code"
+                  [[ "$code" == 2* ]] && exit 0
+                  sleep 5
+                done
+                echo "BACK PROD health check FAILED"; exit 1
+              displayName: Health BACK PROD
+
+            # FRONT PROD (mismo artifact, distinto reemplazo)
+            - script: |
+                set -e
+                WORK="$(Pipeline.Workspace)/front_prod"
+                mkdir -p "$WORK"
+                unzip -q "$(Pipeline.Workspace)/$(ARTIF_FRONT)/front.zip" -d "$WORK"
+
+                SED_INPLACE="-i"
+                if [[ "$OSTYPE" == "darwin"* ]]; then SED_INPLACE="-i ''"; fi
+
+                find "$WORK" -type f \( -name "*.js" -o -name "*.html" \) -print0 \
+                  | xargs -0 sed $SED_INPLACE -e "s#__API_URL__#$(VITE_API_URL_PROD)#g"
+
+                (cd "$WORK" && zip -qr "../front_prod_deploy.zip" .)
+              displayName: Prepare FRONT PROD (replace API URL)
+
+            - task: AzureAppServiceSettings@1
+              displayName: Configure App Settings FRONT PROD
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                appName: '$(APP_FRONT_PROD)'
+                appSettings: |
+                  [
+                    {"name":"NODE_ENV","value":"production"},
+                    {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
+                    {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"1"}
+                  ]
+            - task: AzureWebApp@1
+              displayName: Deploy FRONT PROD (runFromPackage)
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                appType: 'webAppLinux'
+                appName: '$(APP_FRONT_PROD)'
+                deploymentMethod: 'runFromPackage'
+                package: '$(Pipeline.Workspace)/front_prod_deploy.zip'
+                startupCommand: 'pm2 serve /home/site/wwwroot 8080 --no-daemon --spa'
+
+            # Health FRONT PROD
+            - script: |
+                set -e
+                URL="${HEALTH_FRONT_PROD:-https://$(APP_FRONT_PROD).azurewebsites.net/}"
+                echo "Health FRONT PROD: $URL"
+                for i in {1..24}; do
+                  code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+                  echo "  Attempt $i => HTTP $code"
+                  [[ "$code" == 2* ]] && exit 0
+                  sleep 5
+                done
+                echo "FRONT PROD health check FAILED"; exit 1
+              displayName: Health FRONT PROD

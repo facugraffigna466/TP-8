@@ -2,17 +2,26 @@ const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8080;
 
 // Middleware
-app.use(cors());
+const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
 // Base de datos SQLite
-const dbPath = path.join(__dirname, 'database.sqlite');
-const db = new sqlite3.Database(dbPath);
+const DB_FILE = process.env.DATABASE_URL || path.join(__dirname, 'database.sqlite');
+if (DB_FILE.startsWith('/home/site/data')) {
+  try {
+    fs.mkdirSync('/home/site/data', { recursive: true });
+  } catch (e) {
+    // ignore if already exists
+  }
+}
+const db = new sqlite3.Database(DB_FILE);
 
 // Crear tabla de tareas si no existe
 db.serialize(() => {
@@ -117,11 +126,12 @@ app.delete('/api/tareas/:id', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Servidor funcionando correctamente' });
 });
+app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
 
-// Iniciar servidor
-app.listen(PORT, () => {
+// Iniciar servidor (un solo listen)
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`📊 Base de datos: ${dbPath}`);
+  console.log(`📊 Base de datos: ${DB_FILE}`);
 });
 
 // Cerrar conexión a la base de datos al cerrar la aplicación
@@ -135,4 +145,12 @@ process.on('SIGINT', () => {
   });
 });
 
-
+process.on('SIGTERM', () => {
+  db.close((err) => {
+    if (err) {
+      console.error(err.message);
+    }
+    console.log('📦 Conexión a la base de datos cerrada (SIGTERM).');
+    process.exit(0);
+  });
+});
