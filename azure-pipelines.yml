@@ -42,7 +42,11 @@ stages:
       - script: |
           set -e
           cd "$(Build.SourcesDirectory)/$(FRONT_DIR)"
-          npm ci
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
           # Build único con placeholder que luego se reemplaza en QA/PROD
           VITE_API_URL="__API_URL__" npm run build
           cd dist
@@ -53,7 +57,11 @@ stages:
       - script: |
           set -e
           cd "$(Build.SourcesDirectory)/$(BACK_DIR)"
-          npm ci --omit=dev
+          if [ -f package-lock.json ]; then
+            npm ci --omit=dev
+          else
+            npm install --omit=dev --no-audit --no-fund
+          fi
           # Si tu server escucha process.env.PORT, le pasaremos 8080 en App Settings
           zip -r "$(Build.ArtifactStagingDirectory)/back.zip" .
         displayName: Package back (con node_modules)
