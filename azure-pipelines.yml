@@ -92,23 +92,6 @@ stages:
             - download: current
               artifact: $(ARTIF_FRONT)
 
-            # -------- BACK QA: App Settings + Deploy --------
-            - task: AzureAppServiceSettings@1
-              displayName: Configure App Settings BACK QA
-              inputs:
-                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
-                appName: '$(APP_BACK_QA)'
-                appSettings: |
-                  [
-                    {"name":"NODE_ENV","value":"production"},
-                    {"name":"PORT","value":"8080"},
-                    {"name":"WEBSITES_PORT","value":"8080"},
-                    {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
-                    {"name":"WEBSITE_ENABLE_SYNC_UPDATE_SITE","value":"true"},
-                    {"name":"SCM_DO_BUILD_DURING_DEPLOYMENT","value":"true"},
-                    {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"0"},
-                    {"name":"DATABASE_URL","value":"$(DATABASE_URL_QA)"}
-                  ]
             - task: AzureWebApp@1
               displayName: Deploy BACK QA (zipDeploy)
               inputs:
@@ -117,12 +100,11 @@ stages:
                 appName: '$(APP_BACK_QA)'
                 deploymentMethod: 'zipDeploy'
                 package: '$(Pipeline.Workspace)/$(ARTIF_BACK)/back.zip'
-                startupCommand: 'bash -c "mkdir -p /home/site/data && node server.js"'   # backend/server.js
 
             # Health BACK QA
             - script: |
                 set -e
-                BASE="https://$(APP_BACK_QA).azurewebsites.net"
+                BASE="${HEALTH_BACK_QA_BASE:-$(VITE_API_URL_QA)}"
                 URL="${HEALTH_BACK_QA:-$BASE/healthz}"
                 echo "Health BACK QA: $URL"
                 for i in {1..60}; do
@@ -151,17 +133,6 @@ stages:
                 (cd "$WORK" && zip -qr "../front_qa_deploy.zip" .)
               displayName: Prepare FRONT QA (replace API URL)
 
-            - task: AzureAppServiceSettings@1
-              displayName: Configure App Settings FRONT QA
-              inputs:
-                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
-                appName: '$(APP_FRONT_QA)'
-                appSettings: |
-                  [
-                    {"name":"NODE_ENV","value":"production"},
-                    {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
-                    {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"1"}
-                  ]
             - task: AzureWebApp@1
               displayName: Deploy FRONT QA (runFromPackage)
               inputs:
@@ -205,23 +176,6 @@ stages:
             - download: current
               artifact: $(ARTIF_FRONT)
 
-            # BACK PROD
-            - task: AzureAppServiceSettings@1
-              displayName: Configure App Settings BACK PROD
-              inputs:
-                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
-                appName: '$(APP_BACK_PROD)'
-                appSettings: |
-                  [
-                    {"name":"NODE_ENV","value":"production"},
-                    {"name":"PORT","value":"8080"},
-                    {"name":"WEBSITES_PORT","value":"8080"},
-                    {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
-                    {"name":"WEBSITE_ENABLE_SYNC_UPDATE_SITE","value":"true"},
-                    {"name":"SCM_DO_BUILD_DURING_DEPLOYMENT","value":"true"},
-                    {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"0"},
-                    {"name":"DATABASE_URL","value":"$(DATABASE_URL_PROD)"}
-                  ]
             - task: AzureWebApp@1
               displayName: Deploy BACK PROD (zipDeploy)
               inputs:
@@ -230,12 +184,11 @@ stages:
                 appName: '$(APP_BACK_PROD)'
                 deploymentMethod: 'zipDeploy'
                 package: '$(Pipeline.Workspace)/$(ARTIF_BACK)/back.zip'
-                startupCommand: 'bash -c "mkdir -p /home/site/data && node server.js"'
 
             # Health BACK PROD
             - script: |
                 set -e
-                BASE="https://$(APP_BACK_PROD).azurewebsites.net"
+                BASE="${HEALTH_BACK_PROD_BASE:-$(VITE_API_URL_PROD)}"
                 URL="${HEALTH_BACK_PROD:-$BASE/healthz}"
                 echo "Health BACK PROD: $URL"
                 for i in {1..60}; do
@@ -263,17 +216,6 @@ stages:
                 (cd "$WORK" && zip -qr "../front_prod_deploy.zip" .)
               displayName: Prepare FRONT PROD (replace API URL)
 
-            - task: AzureAppServiceSettings@1
-              displayName: Configure App Settings FRONT PROD
-              inputs:
-                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
-                appName: '$(APP_FRONT_PROD)'
-                appSettings: |
-                  [
-                    {"name":"NODE_ENV","value":"production"},
-                    {"name":"WEBSITE_NODE_DEFAULT_VERSION","value":"~20"},
-                    {"name":"WEBSITE_RUN_FROM_PACKAGE","value":"1"}
-                  ]
             - task: AzureWebApp@1
               displayName: Deploy FRONT PROD (runFromPackage)
               inputs:
