@@ -105,10 +105,12 @@ stages:
             - script: |
                 set -e
                 BASE="${HEALTH_BACK_QA_BASE:-$(VITE_API_URL_QA)}"
+                # Normalizar: si no empieza con http/https, prefix https://
+                if [[ ! "$BASE" =~ ^https?:// ]]; then BASE="https://$BASE"; fi
                 URL="${HEALTH_BACK_QA:-$BASE/healthz}"
                 echo "Health BACK QA: $URL"
                 for i in {1..60}; do
-                  code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+                  code=$(curl -sSL -o /dev/null -w "%{http_code}" "$URL" || true)
                   echo "  Attempt $i => HTTP $code"
                   [[ "$code" == 2* ]] && exit 0
                   sleep 5
@@ -189,10 +191,11 @@ stages:
             - script: |
                 set -e
                 BASE="${HEALTH_BACK_PROD_BASE:-$(VITE_API_URL_PROD)}"
+                if [[ ! "$BASE" =~ ^https?:// ]]; then BASE="https://$BASE"; fi
                 URL="${HEALTH_BACK_PROD:-$BASE/healthz}"
                 echo "Health BACK PROD: $URL"
                 for i in {1..60}; do
-                  code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+                  code=$(curl -sSL -o /dev/null -w "%{http_code}" "$URL" || true)
                   echo "  Attempt $i => HTTP $code"
                   [[ "$code" == 2* ]] && exit 0
                   sleep 5
