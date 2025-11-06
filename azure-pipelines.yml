@@ -75,7 +75,7 @@ stages:
 
 # ===================== QA =====================
 - stage: QA
-  displayName: Deploy QA (Back → Health → Front → Health)
+  displayName: Deploy QA
   dependsOn: Build
   variables:
     - group: QA
@@ -181,7 +181,7 @@ stages:
 
 # ===================== PROD =====================
 - stage: PROD
-  displayName: Deploy PROD (Back → Health → Front → Health)
+  displayName: Deploy PROD
   dependsOn: QA
   variables:
     - group: PROD
