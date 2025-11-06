@@ -118,19 +118,36 @@ stages:
                 echo "BACK QA health check FAILED"; exit 1
               displayName: Health BACK QA
 
+            - task: AzureCLI@2
+              displayName: Resolve FRONT QA hostname
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                scriptType: bash
+                scriptLocation: inlineScript
+                inlineScript: |
+                  set -e
+                  HOST=$(az webapp show -n "$(APP_FRONT_QA)" -g "$(AZ_RESOURCE_GROUP)" --query defaultHostName -o tsv)
+                  echo "Front QA default host: $HOST"
+                  echo "##vso[task.setvariable variable=FRONT_HOST_QA]$HOST"
+
             # -------- FRONT QA: re-escritura del placeholder y deploy --------
             - script: |
                 set -e
+                # Determine API base and normalize https
+                API_BASE="$(VITE_API_URL_QA)"
+                if [[ ! "$API_BASE" =~ ^https?:// ]]; then API_BASE="https://$API_BASE"; fi
+                echo "Using API base: $API_BASE"
+
                 WORK="$(Pipeline.Workspace)/front_qa"
                 mkdir -p "$WORK"
                 unzip -q "$(Pipeline.Workspace)/$(ARTIF_FRONT)/front.zip" -d "$WORK"
 
-                # sed compatible mac/linux
                 SED_INPLACE="-i"
                 if [[ "$OSTYPE" == "darwin"* ]]; then SED_INPLACE="-i ''"; fi
 
+                # Replace placeholder with API base
                 find "$WORK" -type f \( -name "*.js" -o -name "*.html" \) -print0 \
-                  | xargs -0 sed $SED_INPLACE -e "s#__API_URL__#$(VITE_API_URL_QA)#g"
+                  | xargs -0 sed $SED_INPLACE -e "s#__API_URL__#${API_BASE}#g"
 
                 (cd "$WORK" && zip -qr "../front_qa_deploy.zip" .)
               displayName: Prepare FRONT QA (replace API URL)
@@ -145,15 +162,18 @@ stages:
                 package: '$(Pipeline.Workspace)/front_qa_deploy.zip'
                 startupCommand: 'pm2 serve /home/site/wwwroot 8080 --no-daemon --spa'
 
-            # Health FRONT QA
             - script: |
                 set -e
-                URL="${HEALTH_FRONT_QA:-https://$(APP_FRONT_QA).azurewebsites.net/}"
+                HOST="${FRONT_HOST_QA}"
+                if [[ -z "$HOST" ]]; then
+                  echo "FRONT_HOST_QA not set"; exit 1
+                fi
+                URL="https://${HOST}/"
                 echo "Health FRONT QA: $URL"
                 for i in {1..24}; do
-                  code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+                  code=$(curl -sSL -o /dev/null -w "%{http_code}" "$URL" || true)
                   echo "  Attempt $i => HTTP $code"
-                  [[ "$code" == 2* ]] && exit 0
+                  [[ "$code" == 2* || "$code" == 3* ]] && exit 0
                   sleep 5
                 done
                 echo "FRONT QA health check FAILED"; exit 1
@@ -203,9 +223,25 @@ stages:
                 echo "BACK PROD health check FAILED"; exit 1
               displayName: Health BACK PROD
 
+            - task: AzureCLI@2
+              displayName: Resolve FRONT PROD hostname
+              inputs:
+                azureSubscription: '$(AZ_SUBSCRIPTION_SC)'
+                scriptType: bash
+                scriptLocation: inlineScript
+                inlineScript: |
+                  set -e
+                  HOST=$(az webapp show -n "$(APP_FRONT_PROD)" -g "$(AZ_RESOURCE_GROUP)" --query defaultHostName -o tsv)
+                  echo "Front PROD default host: $HOST"
+                  echo "##vso[task.setvariable variable=FRONT_HOST_PROD]$HOST"
+
             # FRONT PROD (mismo artifact, distinto reemplazo)
             - script: |
                 set -e
+                API_BASE="$(VITE_API_URL_PROD)"
+                if [[ ! "$API_BASE" =~ ^https?:// ]]; then API_BASE="https://$API_BASE"; fi
+                echo "Using API base: $API_BASE"
+
                 WORK="$(Pipeline.Workspace)/front_prod"
                 mkdir -p "$WORK"
                 unzip -q "$(Pipeline.Workspace)/$(ARTIF_FRONT)/front.zip" -d "$WORK"
@@ -214,7 +250,7 @@ stages:
                 if [[ "$OSTYPE" == "darwin"* ]]; then SED_INPLACE="-i ''"; fi
 
                 find "$WORK" -type f \( -name "*.js" -o -name "*.html" \) -print0 \
-                  | xargs -0 sed $SED_INPLACE -e "s#__API_URL__#$(VITE_API_URL_PROD)#g"
+                  | xargs -0 sed $SED_INPLACE -e "s#__API_URL__#${API_BASE}#g"
 
                 (cd "$WORK" && zip -qr "../front_prod_deploy.zip" .)
               displayName: Prepare FRONT PROD (replace API URL)
@@ -229,15 +265,18 @@ stages:
                 package: '$(Pipeline.Workspace)/front_prod_deploy.zip'
                 startupCommand: 'pm2 serve /home/site/wwwroot 8080 --no-daemon --spa'
 
-            # Health FRONT PROD
             - script: |
                 set -e
-                URL="${HEALTH_FRONT_PROD:-https://$(APP_FRONT_PROD).azurewebsites.net/}"
+                HOST="${FRONT_HOST_PROD}"
+                if [[ -z "$HOST" ]]; then
+                  echo "FRONT_HOST_PROD not set"; exit 1
+                fi
+                URL="https://${HOST}/"
                 echo "Health FRONT PROD: $URL"
                 for i in {1..24}; do
-                  code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+                  code=$(curl -sSL -o /dev/null -w "%{http_code}" "$URL" || true)
                   echo "  Attempt $i => HTTP $code"
-                  [[ "$code" == 2* ]] && exit 0
+                  [[ "$code" == 2* || "$code" == 3* ]] && exit 0
                   sleep 5
                 done
                 echo "FRONT PROD health check FAILED"; exit 1
