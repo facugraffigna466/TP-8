@@ -4,6 +4,20 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
+// Mostrar ayuda y salir si se solicita
+if (process.argv.includes('--help')) {
+  console.log(`
+Uso: node server.js
+
+Variables de entorno:
+  PORT             Puerto donde escucha el servidor (default 8080)
+  CORS_ORIGIN      Orígenes permitidos para CORS (default "*")
+  DATABASE_URL     Ruta del archivo SQLite (default backend/database.sqlite)
+  NODE_ENV         Entorno de ejecución (default development)
+`);
+  process.exit(0);
+}
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
