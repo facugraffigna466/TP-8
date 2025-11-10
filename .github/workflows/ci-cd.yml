@@ -104,6 +104,9 @@ jobs:
     needs: build-and-push
     environment: qa
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Deploy backend container to Render QA
         env:
           RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
@@ -126,6 +129,9 @@ jobs:
     needs: deploy-qa
     environment: prod
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Deploy backend container to Render PROD
         env:
           RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
