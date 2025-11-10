@@ -18,7 +18,7 @@
 | miapp-front-prod | Azure Web App (Linux) | Frontend Prod | Producción |
 | miapp-back-prod | Azure Web App (Linux) | Backend Prod | Producción |
 
----
+----
 
 
 ## Release Pipeline
