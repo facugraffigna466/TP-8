@@ -8,8 +8,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE_NAME: ${{ github.repository }}/backend
-  FRONTEND_IMAGE_NAME: ${{ github.repository }}/frontend
+  BACKEND_IMAGE_NAME: ${{ format('{0}/tp-8/backend', toLower(github.repository_owner)) }}
+  FRONTEND_IMAGE_NAME: ${{ format('{0}/tp-8/frontend', toLower(github.repository_owner)) }}
 
 jobs:
   build-and-test:

@@ -91,11 +91,11 @@ Pasos sugeridos por ambiente (QA/PROD):
 
 1. Generar `RENDER_API_TOKEN` en *Account → API Keys*.
 2. Crear servicio backend (Docker) seleccionando “Existing image” e introduciendo:
-   - `ghcr.io/<owner>/<repo>/backend:qa` (tag inicial arbitraria).
+   - `ghcr.io/<owner en minúsculas>/tp-8/backend:qa` (tag inicial arbitraria; en GHCR los nombres deben ir en minúsculas).
    - “Background worker” desactivado, `PORT 8080`.
    - Montar disco persistente (opcional) para `database.sqlite`.
    - Variables de entorno listadas antes.
-3. Crear servicio frontend similar pero con `ghcr.io/<owner>/<repo>/frontend:qa` y puerto `80`.
+3. Crear servicio frontend similar pero con `ghcr.io/<owner en minúsculas>/tp-8/frontend:qa` y puerto `80`.
 4. Guardar los `Service ID` desde la sección Settings.
 5. Añadir los secretos en GitHub (environments `qa` y `prod`).
 
