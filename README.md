@@ -25,7 +25,7 @@ Pagina-tp5/
 ## 🚀 Instalación y Ejecución
 
 ### Opción 1: Script Automático (Recomendado)
-
+.
 ```bash
 # Iniciar todo automáticamente
 ./start.sh
