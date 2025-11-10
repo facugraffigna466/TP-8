@@ -159,8 +159,12 @@ sqlite3 backend/database.sqlite "SELECT COUNT(*) FROM tareas;"
 
 Para producción, puedes configurar:
 
-- `PORT`: Puerto del servidor backend (default: 3001)
-- `VITE_API_URL`: URL del API backend (default: http://localhost:3001)
+- `PORT`: Puerto del servidor backend (default: 8080)
+- `CORS_ORIGIN`: Orígenes permitidos para el backend (default: `*`)
+- `DATABASE_URL`: Ruta del archivo SQLite (default: `backend/database.sqlite`)
+- `API_URL`: URL del API backend que consumirá el frontend (inyectado en tiempo de ejecución dentro del contenedor; default: `http://localhost:8080`)
+
+Consulta `docs/deployment.md` para la estrategia completa de registry, QA, PROD y pipeline CI/CD.
 
 ## 📝 Funcionalidades
 
