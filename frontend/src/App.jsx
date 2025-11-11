@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
-const runtimeApiUrl = typeof window !== 'undefined' && window.__APP_CONFIG__
-  ? window.__APP_CONFIG__.apiUrl
-  : null
-
-const API_URL = runtimeApiUrl || import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// 🔧 Seleccioná manualmente la URL del backend según el entorno
+// const API_URL = import.meta.env.VITE_API_URL_QA;
+const API_URL = import.meta.env.VITE_API_URL_PROD;
 
 function App() {
   const [tareas, setTareas] = useState([])
@@ -187,4 +185,3 @@ function App() {
 }
 
 export default App
-
