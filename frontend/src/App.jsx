@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 
-const runtimeApiUrl = typeof window !== 'undefined' && window.__APP_CONFIG__
-  ? window.__APP_CONFIG__.apiUrl
-  : null
+const API_URL =
+  (typeof window !== 'undefined' && window.API_URL) ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8080';
 
-const API_URL = runtimeApiUrl || import.meta.env.VITE_API_URL || 'http://localhost:8080'
+console.log("🔗 API_URL utilizada:", API_URL);
 
 function App() {
   const [tareas, setTareas] = useState([])
