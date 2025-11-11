@@ -3,8 +3,8 @@ import axios from 'axios'
 import './App.css'
 
 // 🔧 Seleccioná manualmente la URL del backend según el entorno
-// const API_URL = import.meta.env.VITE_API_URL_QA;
-const API_URL = import.meta.env.VITE_API_URL_PROD;
+const API_URL = import.meta.env.VITE_API_URL_QA;
+//const API_URL = import.meta.env.VITE_API_URL_PROD;
 
 function App() {
   const [tareas, setTareas] = useState([])
