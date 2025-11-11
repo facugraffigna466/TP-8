@@ -13,14 +13,15 @@ GRAPHQL_ENDPOINT = "https://api.render.com/graphql"
 
 def render_request(token: str, payload: dict) -> dict:
     data = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(
-        GRAPHQL_ENDPOINT,
-        data=data,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-    )
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    account_id = os.environ.get("RENDER_ACCOUNT_ID")
+    if account_id:
+        headers["X-Render-Account-Id"] = account_id
+
+    request = urllib.request.Request(GRAPHQL_ENDPOINT, data=data, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
             body = response.read().decode("utf-8")

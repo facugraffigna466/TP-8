@@ -106,6 +106,7 @@ jobs:
     environment: qa
     env:
       RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
+      RENDER_ACCOUNT_ID: ${{ vars.RENDER_ACCOUNT_ID }}
       REGISTRY: ghcr.io
     steps:
       - name: Checkout
@@ -130,6 +131,7 @@ jobs:
     environment: prod
     env:
       RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
+      RENDER_ACCOUNT_ID: ${{ vars.RENDER_ACCOUNT_ID }}
       REGISTRY: ghcr.io
     steps:
       - name: Checkout

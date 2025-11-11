@@ -80,6 +80,7 @@ Registrar los siguientes secretos (según environment adecuado):
 | `RENDER_API_TOKEN` | Token Personal API de Render con permisos de `deploy`. |
 | `RENDER_QA_BACKEND_SERVICE_ID`, `RENDER_QA_FRONTEND_SERVICE_ID` | IDs de los servicios QA (ver en Render UI → Settings → General). |
 | `RENDER_PROD_BACKEND_SERVICE_ID`, `RENDER_PROD_FRONTEND_SERVICE_ID` | IDs de los servicios PROD. |
+| `RENDER_ACCOUNT_ID` | ID del equipo en Render (`tea-...`) necesario para autenticarse vía GraphQL. |
 | `GHCR_TOKEN` | PAT con scopes `read:packages` y `write:packages` (Render lo usará para descargar imágenes privadas). |
 | `GHCR_USERNAME` | Usuario dueño del PAT anterior (solo necesario al crear servicios en Render). |
 
