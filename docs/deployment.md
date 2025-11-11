@@ -77,10 +77,8 @@ Registrar los siguientes secretos (según environment adecuado):
 
 | Secreto | Uso |
 |---|---|
-| `RENDER_API_TOKEN` | Token Personal API de Render con permisos de `deploy`. |
-| `RENDER_QA_BACKEND_SERVICE_ID`, `RENDER_QA_FRONTEND_SERVICE_ID` | IDs de los servicios QA (ver en Render UI → Settings → General). |
-| `RENDER_PROD_BACKEND_SERVICE_ID`, `RENDER_PROD_FRONTEND_SERVICE_ID` | IDs de los servicios PROD. |
-| `RENDER_ACCOUNT_ID` | ID del equipo en Render (`tea-...`) necesario para autenticarse vía GraphQL. |
+| `QA_BACKEND_DEPLOY_HOOK`, `QA_FRONTEND_DEPLOY_HOOK` | URLs de Deploy Hook para los servicios QA. |
+| `PROD_BACKEND_DEPLOY_HOOK`, `PROD_FRONTEND_DEPLOY_HOOK` | URLs de Deploy Hook para los servicios PROD. |
 | `GHCR_TOKEN` | PAT con scopes `read:packages` y `write:packages` (Render lo usará para descargar imágenes privadas). |
 | `GHCR_USERNAME` | Usuario dueño del PAT anterior (solo necesario al crear servicios en Render). |
 
@@ -97,7 +95,7 @@ Pasos sugeridos por ambiente (QA/PROD):
    - Montar disco persistente (opcional) para `database.sqlite`.
    - Variables de entorno listadas antes.
 3. Crear servicio frontend similar pero con `ghcr.io/<owner en minúsculas>/tp-8/frontend:qa` y puerto `80`.
-4. Guardar los `Service ID` desde la sección Settings.
+4. Generar los Deploy Hooks (Settings → Deploy Hooks) y almacenarlos como secretos en GitHub.
 5. Añadir los secretos en GitHub (environments `qa` y `prod`).
 
 > Una vez creado el pipeline, la primera ejecución manual (`workflow_dispatch`) publicará una nueva imagen con tag `<rama>-<runNumber>`. Esa misma ejecución reconfigurará los servicios para usar el tag versionado, garantizando que QA y PROD corren exactamente la misma build.

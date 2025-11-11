@@ -104,47 +104,45 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: qa
-    env:
-      RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
-      RENDER_ACCOUNT_ID: ${{ vars.RENDER_ACCOUNT_ID }}
-      REGISTRY: ghcr.io
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy backend container to Render QA
+      - name: Trigger QA backend deploy hook
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ needs.build-and-push.outputs.owner_lower }}/tp-8/backend:${{ needs.build-and-push.outputs.image_tag }}
+          HOOK_URL: ${{ secrets.QA_BACKEND_DEPLOY_HOOK }}
         run: |
-          python .github/scripts/render_deploy.py \
-            --service-id "${{ vars.RENDER_QA_BACKEND_SERVICE_ID }}" \
-            --image "${{ env.REGISTRY }}/${{ needs.build-and-push.outputs.owner_lower }}/tp-8/backend:${{ needs.build-and-push.outputs.image_tag }}"
+          curl -sSf -X POST "$HOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"imagePath\":\"${IMAGE}\"}"
 
-      - name: Deploy frontend container to Render QA
+      - name: Trigger QA frontend deploy hook
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ needs.build-and-push.outputs.owner_lower }}/tp-8/frontend:${{ needs.build-and-push.outputs.image_tag }}
+          HOOK_URL: ${{ secrets.QA_FRONTEND_DEPLOY_HOOK }}
         run: |
-          python .github/scripts/render_deploy.py \
-            --service-id "${{ vars.RENDER_QA_FRONTEND_SERVICE_ID }}" \
-            --image "${{ env.REGISTRY }}/${{ needs.build-and-push.outputs.owner_lower }}/tp-8/frontend:${{ needs.build-and-push.outputs.image_tag }}"
+          curl -sSf -X POST "$HOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"imagePath\":\"${IMAGE}\"}"
 
   deploy-prod:
     name: Deploy PROD (Render)
     runs-on: ubuntu-latest
     needs: deploy-qa
     environment: prod
-    env:
-      RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
-      RENDER_ACCOUNT_ID: ${{ vars.RENDER_ACCOUNT_ID }}
-      REGISTRY: ghcr.io
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy backend container to Render PROD
+      - name: Trigger PROD backend deploy hook
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ needs.build-and-push.outputs.owner_lower }}/tp-8/backend:${{ needs.build-and-push.outputs.image_tag }}
+          HOOK_URL: ${{ secrets.PROD_BACKEND_DEPLOY_HOOK }}
         run: |
-          python .github/scripts/render_deploy.py \
-            --service-id "${{ vars.RENDER_PROD_BACKEND_SERVICE_ID }}" \
-            --image "${{ env.REGISTRY }}/${{ needs.build-and-push.outputs.owner_lower }}/tp-8/backend:${{ needs.build-and-push.outputs.image_tag }}"
+          curl -sSf -X POST "$HOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"imagePath\":\"${IMAGE}\"}"
 
-      - name: Deploy frontend container to Render PROD
+      - name: Trigger PROD frontend deploy hook
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ needs.build-and-push.outputs.owner_lower }}/tp-8/frontend:${{ needs.build-and-push.outputs.image_tag }}
+          HOOK_URL: ${{ secrets.PROD_FRONTEND_DEPLOY_HOOK }}
         run: |
-          python .github/scripts/render_deploy.py \
-            --service-id "${{ vars.RENDER_PROD_FRONTEND_SERVICE_ID }}" \
-            --image "${{ env.REGISTRY }}/${{ needs.build-and-push.outputs.owner_lower }}/tp-8/frontend:${{ needs.build-and-push.outputs.image_tag }}"
+          curl -sSf -X POST "$HOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"imagePath\":\"${IMAGE}\"}"
