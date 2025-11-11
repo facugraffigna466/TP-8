@@ -105,7 +105,7 @@ jobs:
     needs: build-and-push
     environment: qa
     env:
-      RENDER_API_TOKEN: ${{ vars.RENDER_API_TOKEN }}
+      RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
       REGISTRY: ghcr.io
     steps:
       - name: Checkout
@@ -129,7 +129,7 @@ jobs:
     needs: deploy-qa
     environment: prod
     env:
-      RENDER_API_TOKEN: ${{ vars.RENDER_API_TOKEN }}
+      RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
       REGISTRY: ghcr.io
     steps:
       - name: Checkout
