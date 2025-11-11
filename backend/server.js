@@ -27,14 +27,44 @@ app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
 // Base de datos SQLite
-const DB_FILE = process.env.DATABASE_URL || path.join(__dirname, 'database.sqlite');
-if (DB_FILE.startsWith('/home/site/data')) {
-  try {
-    fs.mkdirSync('/home/site/data', { recursive: true });
-  } catch (e) {
-    // ignore if already exists
+const resolveDatabasePath = () => {
+  const explicit = process.env.DATABASE_URL;
+  if (explicit && explicit.trim() !== '') {
+    return explicit.trim();
   }
+
+  const appEnv = (process.env.APP_ENV || process.env.NODE_ENV || '').toLowerCase();
+  if (appEnv === 'qa' && process.env.DATABASE_URL_QA) {
+    return process.env.DATABASE_URL_QA.trim();
+  }
+  if ((appEnv === 'prod' || appEnv === 'production') && process.env.DATABASE_URL_PRODD) {
+    return process.env.DATABASE_URL_PRODD.trim();
+  }
+
+  return path.join(__dirname, 'database.sqlite');
+};
+
+const DB_FILE = resolveDatabasePath();
+
+const ensureDirectoryFor = (targetPath) => {
+  try {
+    const dir = path.dirname(targetPath);
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (err) {
+    // ignore errors al crear el directorio (puede existir o no ser necesario)
+  }
+};
+
+if (DB_FILE.startsWith('file:')) {
+  // Para URIs estilo SQLite (file:/path?mode=rwc)
+  const parsed = DB_FILE.replace(/^file:/, '').split('?')[0];
+  if (parsed.startsWith('/')) {
+    ensureDirectoryFor(parsed);
+  }
+} else if (DB_FILE.startsWith('/')) {
+  ensureDirectoryFor(DB_FILE);
 }
+
 const db = new sqlite3.Database(DB_FILE);
 
 // Crear tabla de tareas si no existe
