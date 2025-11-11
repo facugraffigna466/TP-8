@@ -16,7 +16,7 @@ SQLite es una **base de datos ligera** que almacena todos los datos en un **úni
 
 ## 🗄️ Estructura de tu Base de Datos
 
-Tu base de datos está en: `backend/database.sqlite`
+Tu base de datos está en: `backend/database.sqlite`.
 
 Es un **archivo físico** que puedes ver, copiar, respaldar, etc.
 
