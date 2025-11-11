@@ -37,8 +37,8 @@ const resolveDatabasePath = () => {
   if (appEnv === 'qa' && process.env.DATABASE_URL_QA) {
     return process.env.DATABASE_URL_QA.trim();
   }
-  if ((appEnv === 'prod' || appEnv === 'production') && process.env.DATABASE_URL_PRODD) {
-    return process.env.DATABASE_URL_PRODD.trim();
+  if ((appEnv === 'prod' || appEnv === 'production') && process.env.DATABASE_URL_PROD) {
+    return process.env.DATABASE_URL_PROD.trim();
   }
 
   return path.join(__dirname, 'database.sqlite');
