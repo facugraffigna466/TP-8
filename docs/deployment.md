@@ -21,7 +21,7 @@
     - `Image URL`: `ghcr.io/<owner>/<repo>/backend:<TAG>` o `frontend:<TAG>` (usar `qa` como valor inicial; el pipeline actualizará la etiqueta exacta en cada despliegue).
     - `Registry` → “Custom”: usuario `GHCR_USERNAME`, contraseña `GHCR_TOKEN`.
   - Variables de entorno QA:
-    - Backend: `PORT=8080`, `CORS_ORIGIN=https://<qa-frontend>.onrender.com`, `DATABASE_URL=/data/database.sqlite` (se monta volumen persistente Render, 1 GiB).
+    - Backend: `PORT=8080`, `CORS_ORIGIN=https://<qa-frontend>.onrender.com`, `DATABASE_URL=<cadena PostgreSQL gestionada (Railway/Render)>`, `PGSSL=true` (necesario para conexiones TLS).
     - Frontend: `API_URL=https://<qa-backend>.onrender.com`.
   - Recursos sugeridos QA:
     - Backend: plan Starter, 0.5 vCPU, 512 MB RAM, 1 réplica.
@@ -35,7 +35,7 @@
 - **Configuración recomendada:**
   - Crear dos servicios Docker adicionales (backend y frontend prod) apuntando inicialmente a la etiqueta `prod`.
   - Variables de entorno PROD:
-    - Backend: `PORT=8080`, `CORS_ORIGIN=https://<prod-frontend>.onrender.com`, `DATABASE_URL=/data/database.sqlite` (o migrar a PostgreSQL administrado si se requiere HA).
+    - Backend: `PORT=8080`, `CORS_ORIGIN=https://<prod-frontend>.onrender.com`, `DATABASE_URL=<cadena PostgreSQL productiva>`, `PGSSL=true`.
     - Frontend: `API_URL=https://<prod-backend>.onrender.com`.
   - Recursos PROD:
     - Backend: 1 vCPU, 2 GB RAM, mínimo 2 réplicas, máximo 4.
@@ -58,12 +58,12 @@ El workflow `CI/CD - TP-8` automatiza el proceso completo:
      - `latest` (para debugging manual).
      - `<rama>-<runNumber>` (usada en despliegues automáticos).
 3. **Deploy QA (`deploy-qa`):**
-   - Invoca el script reutilizable `.github/scripts/render_deploy.py`, que consume el token de API de Render y llama al endpoint GraphQL `deployService` para actualizar los servicios QA con la imagen versionada.
+   - Ejecuta los Deploy Hooks de Render (`QA_BACKEND_DEPLOY_HOOK`, `QA_FRONTEND_DEPLOY_HOOK`) enviando la imagen versionada publicada en GHCR.
    - Se asocia al environment `qa` de GitHub; se pueden agregar revisores opcionales.
 4. **Deploy PROD (`deploy-prod`):**
    - Requiere aprobación manual del environment `prod`.
    - Reutiliza el mismo tag publicado en GHCR para garantizar paridad QA→PROD.
-   - Ejecuta el mismo script para disparar despliegues en los servicios PROD y deja el resultado del request en los logs de la acción.
+   - Dispara los hooks de Render para backend y frontend productivo utilizando la misma imagen versionada.
 
 ### Quality Gates y Segregación
 
@@ -88,15 +88,11 @@ Registrar los siguientes secretos (según environment adecuado):
 
 Pasos sugeridos por ambiente (QA/PROD):
 
-1. Generar `RENDER_API_TOKEN` en *Account → API Keys*.
-2. Crear servicio backend (Docker) seleccionando “Existing image” e introduciendo:
-   - `ghcr.io/<owner en minúsculas>/tp-8/backend:qa` (tag inicial arbitraria; en GHCR los nombres deben ir en minúsculas).
-   - “Background worker” desactivado, `PORT 8080`.
-   - Montar disco persistente (opcional) para `database.sqlite`.
-   - Variables de entorno listadas antes.
-3. Crear servicio frontend similar pero con `ghcr.io/<owner en minúsculas>/tp-8/frontend:qa` y puerto `80`.
-4. Generar los Deploy Hooks (Settings → Deploy Hooks) y almacenarlos como secretos en GitHub.
-5. Añadir los secretos en GitHub (environments `qa` y `prod`).
+1. Crear servicio backend (Docker) seleccionando “Deploy an existing image” e introduciendo `ghcr.io/<owner en minúsculas>/tp-8/backend:qa` (o `:latest` para el primer despliegue).
+2. Configurar variables: `PORT=8080`, `CORS_ORIGIN=<url del frontend>` y `DATABASE_URL=<cadena PostgreSQL con sslmode=require>`.
+3. Crear servicio frontend (Static) apuntando a `ghcr.io/<owner>/tp-8/frontend:qa` y puerto `80`. Definir `API_URL` con la URL pública del backend.
+4. Repetir los pasos 1-3 para PROD (cambiando las URLs y la cadena `DATABASE_URL`).
+5. Generar los Deploy Hooks desde *Settings → Deploy Hooks* para cada servicio y guardarlos en GitHub como secretos.
 
 > Una vez creado el pipeline, la primera ejecución manual (`workflow_dispatch`) publicará una nueva imagen con tag `<rama>-<runNumber>`. Esa misma ejecución reconfigurará los servicios para usar el tag versionado, garantizando que QA y PROD corren exactamente la misma build.
 
@@ -104,6 +100,6 @@ Pasos sugeridos por ambiente (QA/PROD):
 
 - Añadir suites de pruebas automatizadas para backend y frontend.
 - Incluir escaneo de vulnerabilidades (`trivy`, `npm audit`, `osv-scanner`).
-- Implementar migraciones de base de datos o migrar a un motor administrado si se escala más allá de SQLite.
+- Gestionar migraciones y backups de PostgreSQL (por ejemplo con `prisma migrate`, `sqitch` o `pg_dump`).
 - Configurar monitoreo (Render Metrics, Prometheus, Sentry) y alertas de uptime.
 

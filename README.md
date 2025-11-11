@@ -1,6 +1,6 @@
 # Aplicación de Gestión de Tareas
 
-Una aplicación web simple con frontend (React), backend (Node.js/Express) y base de datos (SQLite).
+Una aplicación web simple con frontend (React), backend (Node.js/Express) y base de datos PostgreSQL.
 
 ## 📁 Estructura del Proyecto
 
@@ -8,8 +8,7 @@ Una aplicación web simple con frontend (React), backend (Node.js/Express) y bas
 Pagina-tp5/
 ├── backend/
 │   ├── server.js          # Servidor Express con API REST
-│   ├── package.json       # Dependencias del backend
-│   └── database.sqlite    # Base de datos SQLite (se crea automáticamente)
+│   └── package.json       # Dependencias del backend
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx        # Componente principal
@@ -47,10 +46,10 @@ cd backend
 npm install
 ```
 
-3. Si el puerto 3001 está ocupado, detener el proceso:
+3. Si el puerto 8080 está ocupado, detener el proceso:
 ```bash
-# Detener procesos en puerto 3001
-lsof -ti:3001 | xargs kill -9
+# Detener procesos en puerto 8080
+lsof -ti:8080 | xargs kill -9
 ```
 
 4. Iniciar el servidor:
@@ -58,7 +57,7 @@ lsof -ti:3001 | xargs kill -9
 npm start
 ```
 
-El servidor correrá en `http://localhost:3001`
+El servidor correrá en `http://localhost:8080`
 
 #### Frontend
 
@@ -97,63 +96,30 @@ La aplicación estará disponible en `http://localhost:5173`
 
 ## 🗄️ Base de Datos
 
-La aplicación usa SQLite. La base de datos se crea automáticamente al iniciar el servidor.
+El backend utiliza PostgreSQL. En desarrollo puedes levantarlo con Docker:
 
-> 📚 **¿Nunca usaste SQLite?** Revisa estos archivos:
-> - `GUIA_SQLITE.md` - Guía completa para principiantes
-> - `COMO_FUNCIONA.md` - Cómo se conectan frontend, backend y base de datos
-> - `backend/prueba-sqlite.sh` - Tutorial interactivo paso a paso
-> - `backend/ejemplos-sqlite.sql` - Ejemplos de comandos SQL
+```bash
+docker run --name tp8-db \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=tp8 \
+  -p 5432:5432 \
+  -d postgres:16
 
-Estructura de la tabla `tareas`:
-- `id` (INTEGER PRIMARY KEY)
+# Exporta la URL antes de iniciar el backend
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/tp8
+```
+
+En Render/Railway basta con definir la variable `DATABASE_URL` con la cadena de conexión provista por el servicio gestionado. El backend inicializa automáticamente la tabla `tareas`:
+
+- `id` (SERIAL PRIMARY KEY)
 - `titulo` (TEXT)
 - `descripcion` (TEXT)
-- `completada` (INTEGER, 0 o 1)
-- `fecha_creacion` (DATETIME)
+- `completada` (BOOLEAN)
+- `fecha_creacion` (TIMESTAMPTZ)
 
-### Ver la Base de Datos
+Para inspeccionar la base en producción puedes usar el cliente web de Render/Railway o cualquier herramienta compatible con PostgreSQL (`psql`, TablePlus, DBeaver, etc.).
 
-#### Opción 1: Script Automático (Recomendado)
-```bash
-cd backend
-./view-db-pretty.sh
-```
-
-O la versión simple:
-```bash
-./view-db.sh
-```
-
-#### Opción 2: Desde la Terminal
-
-```bash
-cd backend
-sqlite3 database.sqlite
-```
-
-Comandos útiles dentro de sqlite3:
-```sql
-.tables                    -- Ver todas las tablas
-.schema tareas            -- Ver estructura de la tabla
-SELECT * FROM tareas;     -- Ver todos los registros
-.headers on               -- Activar encabezados
-.mode column              -- Modo columnas
-.quit                     -- Salir
-```
-
-#### Opción 3: Consultas Directas
-
-```bash
-# Ver todos los registros
-sqlite3 backend/database.sqlite "SELECT * FROM tareas;"
-
-# Ver con formato bonito
-sqlite3 -header -column backend/database.sqlite "SELECT * FROM tareas;"
-
-# Contar tareas
-sqlite3 backend/database.sqlite "SELECT COUNT(*) FROM tareas;"
-```
+> ℹ️ Las guías relacionadas a SQLite (`GUIA_SQLITE.md`, `backend/ejemplos-sqlite.sql`, etc.) se conservan solo como referencia histórica.
 
 ## 🌐 Variables de Entorno
 
@@ -161,7 +127,8 @@ Para producción, puedes configurar:
 
 - `PORT`: Puerto del servidor backend (default: 8080)
 - `CORS_ORIGIN`: Orígenes permitidos para el backend (default: `*`)
-- `DATABASE_URL`: Ruta del archivo SQLite (default: `backend/database.sqlite`)
+- `DATABASE_URL`: Cadena de conexión PostgreSQL (ej. `postgresql://user:pass@host:5432/db`)
+- `PGSSL`: Forzar o deshabilitar SSL (`true`/`false`). Por defecto se activa automáticamente para hosts no locales.
 - `API_URL`: URL del API backend que consumirá el frontend (inyectado en tiempo de ejecución dentro del contenedor; default: `http://localhost:8080`)
 
 Consulta `docs/deployment.md` para la estrategia completa de registry, QA, PROD y pipeline CI/CD.
@@ -177,6 +144,6 @@ Consulta `docs/deployment.md` para la estrategia completa de registry, QA, PROD 
 ## 🔧 Tecnologías Utilizadas
 
 - **Frontend**: React 18, Vite, Axios
-- **Backend**: Node.js, Express, SQLite3
+- **Backend**: Node.js, Express, PostgreSQL (pg)
 - **Estilos**: CSS puro con diseño moderno
 
